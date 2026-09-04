@@ -1,4 +1,8 @@
-name: Build Android APK (ARM64)
+# (Pega el código anterior, guarda con CTRL+O, Enter, CTRL+X)
+
+git add .github/workflows/compile.yml
+git commit -m "Optimizar velocidad de compilacion en Actions"
+git push origin mainname: Build Android APK (ARM64 Rapido)
 
 on:
   push:
@@ -13,11 +17,7 @@ jobs:
     steps:
       - name: Liberar espacio en disco
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
 
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -26,7 +26,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -34,21 +33,19 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Gradle Cache
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Instalar dependencias
-        run: npm install
+      - name: Instalar dependencias rapidas
+        run: npm ci || npm install --prefer-offline --no-audit
 
       - name: Generar carpeta android (expo prebuild)
         run: npx expo prebuild --platform android --clean
 
-      - name: Compilar APK release (solo arm64-v8a)
+      - name: Compilar APK release (Optimizado)
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
+          SOURCEMAP_RELEASE_MANIFEST: false
         run: |
           cd android
-          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --parallel --build-cache --no-daemon
 
       - name: Subir APK como artefacto
         uses: actions/upload-artifact@v4
