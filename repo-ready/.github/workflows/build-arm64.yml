@@ -1,0 +1,68 @@
+name: Build APK (arm64 only)
+
+on:
+    push:
+        branches:
+            - main
+        paths-ignore:
+            - 'README.md'
+            - '.github/ISSUE_TEMPLATE/**'
+    workflow_dispatch: {}
+
+jobs:
+    build-arm64:
+        runs-on: ubuntu-latest
+        steps:
+            # Libera espacio SOLO de herramientas que no usamos (.NET, Haskell,
+            # paquetes grandes de apt, imágenes docker, swap). NO toca el
+            # Android SDK/NDK ni el tool-cache, para no romper el build.
+            - name: Liberar espacio en disco
+              uses: jlumbroso/free-disk-space@main
+              with:
+                  tool-cache: false
+                  android: false
+                  dotnet: true
+                  haskell: true
+                  large-packages: true
+                  docker-images: true
+                  swap-storage: true
+
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: Setup Java
+              uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: '17'
+
+            - name: Instalar dependencias
+              run: npm ci
+
+            - name: Generar carpeta android (expo prebuild)
+              run: npx expo prebuild --platform android --clean
+
+            - name: Compilar APK release (solo arm64-v8a)
+              working-directory: android
+              env:
+                  ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
+              run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+            # Limpia solo las cachés de gradle DESPUÉS de compilar, nunca
+            # carpetas del proyecto ni el SDK de Android.
+            - name: Limpiar cachés de gradle
+              if: always()
+              run: rm -rf ~/.gradle/caches ~/.gradle/wrapper
+
+            - name: Subir APK como artefacto
+              uses: actions/upload-artifact@v4
+              with:
+                  name: chatterui-arm64
+                  path: android/app/build/outputs/apk/release/*.apk
+                  retention-days: 14
