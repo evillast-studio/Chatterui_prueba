@@ -1,8 +1,4 @@
-# (Pega el código anterior, guarda con CTRL+O, Enter, CTRL+X)
-
-git add .github/workflows/compile.yml
-git commit -m "Optimizar velocidad de compilacion en Actions"
-git push origin mainname: Build Android APK (ARM64 Rapido)
+name: Build Android APK (ARM64 Rapido)
 
 on:
   push:
@@ -13,7 +9,7 @@ on:
 jobs:
   build-arm64:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Liberar espacio en disco
         run: |
