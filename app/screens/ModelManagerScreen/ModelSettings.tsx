@@ -99,9 +99,9 @@ const ModelSettings: React.FC<ModelSettingsProp> = ({ modelImporting, modelLoadi
                         label={t('model.maxcontext')}
                         value={config.context_length}
                         onValueChange={(value) => setConfig({ ...config, context_length: value })}
-                        min={1024}
+                        min={400}
                         max={32768}
-                        step={1024}
+                        step={256}
                         disabled={modelImporting || modelLoading}
                     />
                     <ThemedSlider
