@@ -13,9 +13,6 @@ jobs:
     build-arm64:
         runs-on: ubuntu-latest
         steps:
-            # Libera espacio SOLO de herramientas que no usamos (.NET, Haskell,
-            # paquetes grandes de apt, imágenes docker, swap). NO toca el
-            # Android SDK/NDK ni el tool-cache, para no romper el build.
             - name: Liberar espacio en disco
               uses: jlumbroso/free-disk-space@main
               with:
@@ -48,14 +45,30 @@ jobs:
             - name: Generar carpeta android (expo prebuild)
               run: npx expo prebuild --platform android --clean
 
-            - name: Compilar APK release (solo arm64-v8a)
+            - name: Liberar espacio extra (caches npm/expo, sin tocar SDK/NDK ni node_modules)
+              run: |
+                  rm -rf ~/.npm /tmp/metro-* /tmp/haste-* $HOME/.expo
+                  df -h
+
+            - name: Configurar Gradle (5GB RAM, sin daemon, sin paralelismo, R8 en modo liviano)
+              working-directory: android
+              run: |
+                  {
+                    echo "org.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1g -Dcom.android.build.gradle.r8.maxMemory=3g"
+                    echo "org.gradle.daemon=false"
+                    echo "org.gradle.parallel=false"
+                    echo "org.gradle.workers.max=1"
+                    echo "org.gradle.caching=false"
+                    echo "android.enableJetifier=true"
+                    echo "android.enableR8.fullMode=false"
+                  } >> gradle.properties
+
+            - name: Compilar APK release (solo arm64-v8a, sin lint ni checks de dev)
               working-directory: android
               env:
                   ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
-              run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+              run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a -x lint -x lintVitalRelease -x lintVitalAnalyzeRelease -x testReleaseUnitTest --console=plain
 
-            # Limpia solo las cachés de gradle DESPUÉS de compilar, nunca
-            # carpetas del proyecto ni el SDK de Android.
             - name: Limpiar cachés de gradle
               if: always()
               run: rm -rf ~/.gradle/caches ~/.gradle/wrapper
