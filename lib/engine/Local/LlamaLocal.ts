@@ -5,7 +5,7 @@ import {
     initLlama,
     LlamaContext,
     RNLLAMA_MTMD_DEFAULT_MEDIA_MARKER,
-} from 'cui-llama.rn'
+} from 'llama.rn'
 import { t } from 'i18next'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -72,11 +72,15 @@ export type LlamaConfig = {
     ubatch: number
     use_mmap: boolean
     use_mlock: boolean
-    flash_attn: boolean
+    flash_attn_type: 'auto' | 'on' | 'off'
     cache_type_k: string
     cache_type_v: string
     kv_unified: boolean
     swa_full: boolean
+    // --- Nuevos parámetros llama.rn 0.12.9 ---
+    cpu_mask: string           // Ej: '4-7' para cores A73 en Kirin 710. Vacío = sin fijar
+    no_extra_bufts: boolean    // Reduce RAM desactivando buffer de repack (algo más lento en prefill)
+    rope_freq_base: number     // 0 = valor del modelo. >0 overrides (ej. 500000 para extender contexto)
 }
 
 export type EngineDataProps = {
@@ -104,11 +108,15 @@ const defaultConfig = {
     ubatch: 512,
     use_mmap: true,
     use_mlock: true,
-    flash_attn: false,
+    flash_attn_type: 'off',
     cache_type_k: 'f16',
     cache_type_v: 'f16',
     kv_unified: true,
     swa_full: true,
+    // Nuevos en llama.rn 0.12.9
+    cpu_mask: '',              // Vacío = dejar que el SO decida
+    no_extra_bufts: false,     // false = repack ON (más rápido en ARM)
+    rope_freq_base: 0,         // 0 = usar el valor que trae el modelo
 }
 
 export namespace Llama {
@@ -158,12 +166,18 @@ export namespace Llama {
                         persistedState.config.ubatch = persistedState.config.batch ?? 512
                         persistedState.config.use_mmap = true
                         persistedState.config.use_mlock = true
-                        persistedState.config.flash_attn = false
+                        // MIGRADO: flash_attn (bool) → flash_attn_type (string)
+                        persistedState.config.flash_attn_type = persistedState.config.flash_attn ? 'on' : 'off'
+                        delete persistedState.config.flash_attn
                         persistedState.config.cache_type_k = 'f16'
                         persistedState.config.cache_type_v = 'f16'
                         persistedState.config.kv_unified = true
                         persistedState.config.swa_full = true
-                        Logger.info('Migrated to v4 EngineData')
+                        // Nuevos campos llama.rn 0.12.9
+                        persistedState.config.cpu_mask = ''
+                        persistedState.config.no_extra_bufts = false
+                        persistedState.config.rope_freq_base = 0
+                        Logger.info('Migrated to v4 EngineData (llama.rn: flash_attn_type + new params)')
                     }
                     return persistedState
                 },
@@ -213,17 +227,19 @@ export namespace Llama {
                 use_mlock: config.use_mlock,
                 use_mmap: config.use_mmap,
                 devices: config.devices,
-                // Cast: not in every version of ContextParams' TS types, but
-                // supported at the native/runtime level in cui-llama.rn.
-                flash_attn: config.flash_attn,
+                flash_attn_type: config.flash_attn_type,
                 cache_type_k: config.cache_type_k,
                 cache_type_v: config.cache_type_v,
                 kv_unified: config.kv_unified,
                 swa_full: config.swa_full,
+                // Nuevos en llama.rn 0.12.9
+                ...(config.cpu_mask ? { cpu_mask: config.cpu_mask } : {}),
+                no_extra_bufts: config.no_extra_bufts,
+                ...(config.rope_freq_base > 0 ? { rope_freq_base: config.rope_freq_base } : {}),
             } as ContextParams
 
             Logger.info(
-                `\n------ MODEL LOAD -----\n Model Name: ${model.name}\nStarting with parameters: \nContext Length: ${params.n_ctx}\nThreads: ${params.n_threads}\nBatch Size: ${params.n_batch}\nuBatch Size: ${config.ubatch}\nGPU Layers: ${params.n_gpu_layers}\nuse_mmap: ${config.use_mmap}\nuse_mlock: ${config.use_mlock}\nflash_attn: ${config.flash_attn}\ncache_type_k: ${config.cache_type_k}\ncache_type_v: ${config.cache_type_v}\nkv_unified: ${config.kv_unified}\nswa_full: ${config.swa_full}`
+                `\n------ MODEL LOAD -----\n Model Name: ${model.name}\nStarting with parameters: \nContext Length: ${params.n_ctx}\nThreads: ${params.n_threads}\nBatch Size: ${params.n_batch}\nuBatch Size: ${config.ubatch}\nGPU Layers: ${params.n_gpu_layers}\nuse_mmap: ${config.use_mmap}\nuse_mlock: ${config.use_mlock}\nflash_attn_type: ${config.flash_attn_type}\ncache_type_k: ${config.cache_type_k}\ncache_type_v: ${config.cache_type_v}\nkv_unified: ${config.kv_unified}\nswa_full: ${config.swa_full}\ncpu_mask: ${config.cpu_mask || "(auto)"}\nno_extra_bufts: ${config.no_extra_bufts}\nrope_freq_base: ${config.rope_freq_base || "(modelo)"}\n`
             )
 
             const progressCallback = (progress: number) => {

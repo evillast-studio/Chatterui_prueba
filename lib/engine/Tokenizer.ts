@@ -1,4 +1,4 @@
-import { initLlama, LlamaContext } from 'cui-llama.rn'
+import { initLlama, LlamaContext } from 'llama.rn'
 import { Asset } from 'expo-asset'
 import { create } from 'zustand'
 

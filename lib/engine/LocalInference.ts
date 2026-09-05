@@ -1,4 +1,4 @@
-import { JinjaFormattedChatResult } from 'cui-llama.rn'
+import { JinjaFormattedChatResult } from 'llama.rn'
 import { t } from 'i18next'
 
 import Alert from '@components/views/Alert'
@@ -302,7 +302,7 @@ const runLocalCompletion = async (
 ) => {
     const stopRegex = RegExp(
         constructReplaceStrings()
-            .map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, '\$&'))
             .join(`|`),
         'g'
     )
@@ -315,10 +315,36 @@ const runLocalCompletion = async (
         await Llama.useLlamaModelStore.getState().stopCompletion()
     })
 
+    // Batch buffer: acumular tokens y flushear cada ~50ms en modo rendimiento
+    // Reduce re-renders de Zustand de 1/token a ~1/50ms (~20/s)
+    const perfMode = mmkv.getBoolean(AppSettings.PerformanceMode)
+    let tokenBatch = ''
+    let batchTimer: ReturnType<typeof setTimeout> | null = null
+    const BATCH_MS = 50
+
+    const flushBatch = () => {
+        if (!tokenBatch) return
+        const chunk = tokenBatch
+        tokenBatch = ''
+        Chats.useChatState.getState().insertToBuffer(chunk)
+    }
+
     let reasoningMode = false
     const outputStream = (text: string) => {
         const cleaned = cleanStopString(text)
-        Chats.useChatState.getState().insertToBuffer(cleanStopString(text))
+        // Performance: calcular cleaned una sola vez y reusar (evita 2 regex por token)
+        if (perfMode) {
+            // Batch: acumular en string local, flushear cada BATCH_MS
+            if (!reasoningMode) tokenBatch += cleaned
+            if (!batchTimer) {
+                batchTimer = setTimeout(() => {
+                    batchTimer = null
+                    flushBatch()
+                }, BATCH_MS)
+            }
+        } else {
+            Chats.useChatState.getState().insertToBuffer(cleaned)
+        }
         /**
          * @TODO implement think seperation for TTS
          */
@@ -333,10 +359,16 @@ const runLocalCompletion = async (
             reasoningMode = true
             return
         }
-        useTTSStore.getState().insertBuffer(cleanStopString(text))
+        useTTSStore.getState().insertBuffer(cleaned)
     }
 
     const outputCompleted = (text: string, timings: CompletionTimings) => {
+        // Flush cualquier token pendiente en el batch antes de cerrar
+        if (batchTimer) {
+            clearTimeout(batchTimer)
+            batchTimer = null
+        }
+        flushBatch()
         Chats.useChatState.getState().setBufferTimings(timings)
         if (mmkv.getBoolean(AppSettings.PrintContext)) Logger.info(`Completion Output:\n${text}`)
         stopGenerating()

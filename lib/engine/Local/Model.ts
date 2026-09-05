@@ -1,5 +1,5 @@
 import { copyFileSAF, getContentFd, persistContentPermission } from '@vali98/react-native-fs'
-import { loadLlamaModelInfo } from 'cui-llama.rn'
+import { loadLlamaModelInfo } from 'llama.rn'
 import { eq, inArray, notInArray } from 'drizzle-orm'
 import { getDocumentAsync } from 'expo-document-picker'
 import { t } from 'i18next'

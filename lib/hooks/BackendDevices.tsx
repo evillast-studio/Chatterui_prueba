@@ -1,4 +1,4 @@
-import { getBackendDevicesInfo } from 'cui-llama.rn'
+import { getBackendDevicesInfo } from 'llama.rn'
 import { useEffect, useState } from 'react'
 
 import { Logger } from '@lib/state/Logger'

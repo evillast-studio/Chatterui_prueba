@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { initLlama, LlamaContext } from 'cui-llama.rn'
+import { initLlama, LlamaContext } from 'llama.rn'
 import { Paths } from 'expo-file-system'
 import { useState } from 'react'
 import { Text, TextInput, TouchableOpacity, View } from 'react-native'

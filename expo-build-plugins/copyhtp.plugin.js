@@ -2,7 +2,7 @@ const { withDangerousMod } = require('@expo/config-plugins')
 const fs = require('fs')
 const path = require('path')
 
-const SOURCE_PATH = 'node_modules/cui-llama.rn/bin/arm64-v8a'
+const SOURCE_PATH = 'node_modules/llama.rn/bin/arm64-v8a'
 const TARGET_RELATIVE_PATH = 'app/src/main/assets/ggml-hexagon'
 
 function syncDevAssets(projectRoot, androidPath) {

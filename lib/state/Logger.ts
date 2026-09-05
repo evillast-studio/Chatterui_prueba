@@ -87,6 +87,12 @@ export namespace Logger {
         insertLogs(logItem)
     }
 
+    // Versión de info que no escribe en MMKV ni en el store — para hotpaths
+    export const infoDirect = (data: string) => {
+        if (mmkv.getBoolean(AppSettings.PerformanceMode)) return
+        console.log(`[INFO]: ${data}`)
+    }
+
     export const infoToast = (data: string, internal?: string) => {
         info(data)
         if (internal) {
