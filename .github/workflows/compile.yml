@@ -1,0 +1,61 @@
+name: Build Android APK (ARM64 Rapido)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Liberar espacio en disco
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Cache Gradle y node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            node_modules
+          key: ${{ runner.os }}-build-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Instalar dependencias rapidas
+        run: npm ci || npm install --prefer-offline --no-audit
+
+      - name: Generar carpeta android (expo prebuild)
+        run: npx expo prebuild --platform android --clean
+
+      - name: Compilar APK release (Optimizado)
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
+          SOURCEMAP_RELEASE_MANIFEST: false
+        run: |
+          cd android
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --parallel --build-cache --no-daemon
+
+      - name: Subir APK como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatterui-arm64
+          path: android/app/build/outputs/apk/release/*.apk

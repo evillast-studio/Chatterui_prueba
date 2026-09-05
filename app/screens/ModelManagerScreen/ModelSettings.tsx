@@ -9,6 +9,7 @@ import { useShallow } from 'zustand/react/shallow'
 import ThemedButton from '@components/buttons/ThemedButton'
 import HorizontalSelector from '@components/input/HorizontalSelector'
 import ThemedSlider from '@components/input/ThemedSlider'
+import ThemedTextInput from '@components/input/ThemedTextInput'
 import ThemedSwitch from '@components/input/ThemedSwitch'
 import SectionTitle from '@components/text/SectionTitle'
 import Alert from '@components/views/Alert'
@@ -98,9 +99,9 @@ const ModelSettings: React.FC<ModelSettingsProp> = ({ modelImporting, modelLoadi
                         label={t('model.maxcontext')}
                         value={config.context_length}
                         onValueChange={(value) => setConfig({ ...config, context_length: value })}
-                        min={1024}
+                        min={400}
                         max={32768}
-                        step={1024}
+                        step={256}
                         disabled={modelImporting || modelLoading}
                     />
                     <ThemedSlider
@@ -136,6 +137,24 @@ const ModelSettings: React.FC<ModelSettingsProp> = ({ modelImporting, modelLoadi
                         disabled={modelImporting || modelLoading}
                     />
 
+                    <ThemedTextInput
+                        label="CPU Mask (cpu_mask)"
+                        description="Fijar cores específicos para inferencia. Vacío = automático. Ej: '4-7' para usar solo los 4 cores grandes (A73) en Kirin 710 y evitar los lentos A53."
+                        value={config.cpu_mask}
+                        onChangeText={(value) => setConfig({ ...config, cpu_mask: value })}
+                        placeholder="Ej: 4-7  (vacío = auto)"
+                        containerStyle={{ marginBottom: 16 }}
+                        editable={!modelImporting && !modelLoading}
+                    />
+                    <ThemedSlider
+                        label="RoPE freq base (rope_freq_base)"
+                        value={config.rope_freq_base}
+                        onValueChange={(value) => setConfig({ ...config, rope_freq_base: value })}
+                        min={0}
+                        max={1000000}
+                        step={10000}
+                        disabled={modelImporting || modelLoading}
+                    />
                     <ThemedSwitch
                         label={t('model.contextshift')}
                         value={config.ctx_shift}
@@ -188,12 +207,16 @@ const ModelSettings: React.FC<ModelSettingsProp> = ({ modelImporting, modelLoadi
                         onChangeValue={(value) => setConfig({ ...config, use_mlock: value })}
                         disabled={modelImporting || modelLoading}
                     />
-                    <ThemedSwitch
+                    <HorizontalSelector
+                        style={{ paddingBottom: 12 }}
                         label="Flash Attention"
-                        description="Puede acelerar la generación en hardware compatible. Si tu dispositivo/backend no lo soporta, puede fallar al cargar el modelo o no dar mejora — probalo y si falla, desactivalo."
-                        value={config.flash_attn}
-                        onChangeValue={(value) => setConfig({ ...config, flash_attn: value })}
-                        disabled={modelImporting || modelLoading}
+                        values={[
+                            { label: 'off', value: 'off' },
+                            { label: 'auto', value: 'auto' },
+                            { label: 'on', value: 'on' },
+                        ]}
+                        selected={config.flash_attn_type ?? 'off'}
+                        onPress={(value) => setConfig({ ...config, flash_attn_type: value as 'auto' | 'on' | 'off' })}
                     />
                     <HorizontalSelector
                         style={{ paddingBottom: 12 }}
@@ -229,6 +252,13 @@ const ModelSettings: React.FC<ModelSettingsProp> = ({ modelImporting, modelLoadi
                         description="Usa caché de Sliding Window Attention a tamaño completo en vez de reducido. Evita artefactos de context-shift en modelos con SWA (ej. Gemma 3), a costa de algo más de RAM."
                         value={config.swa_full}
                         onChangeValue={(value) => setConfig({ ...config, swa_full: value })}
+                        disabled={modelImporting || modelLoading}
+                    />
+                    <ThemedSwitch
+                        label="Sin buffers extra (no_extra_bufts)"
+                        description="Desactiva el buffer de repack de pesos. Reduce RAM usada, pero el prefill (procesar el prompt) es algo más lento. Útil si el modelo está muy justo de memoria."
+                        value={config.no_extra_bufts}
+                        onChangeValue={(value) => setConfig({ ...config, no_extra_bufts: value })}
                         disabled={modelImporting || modelLoading}
                     />
                 </>

@@ -118,9 +118,9 @@ export const Samplers = {
         macro: '{{max_context_length}}',
         values: {
             type: 'integer',
-            min: 1024,
+            min: 400,
             max: 2 ** 20,
-            default: 8192,
+            default: 2048,
             step: 16,
             precision: 0,
             ignoreIf: 0,
